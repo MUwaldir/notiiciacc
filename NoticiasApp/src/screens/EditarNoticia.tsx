@@ -294,7 +294,7 @@ export const EditarNoticiaScreen = () => {
 
 const styles = StyleSheet.create({
   container: { padding: 16 },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 16 },
+  title: { fontSize: 24, fontWeight: "bold", marginBottom: 16,marginTop:20 },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",

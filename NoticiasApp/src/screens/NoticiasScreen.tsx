@@ -1,24 +1,30 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   FlatList,
   ActivityIndicator,
-  Alert,
+  Animated,
   TouchableOpacity,
   StyleSheet,
   Modal,
   Image,
   TouchableWithoutFeedback,
+  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from "react-native";
+
 import api from "../api/axios";
 import ImageSlider from "../components/ImageSlider";
 import AuthorInfo from "../components/AuthorInfo";
 import PostContent from "../components/PostContent";
 import PostActions from "../components/PostActions";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Dimensions } from "react-native";
+
 import { Picker } from "@react-native-picker/picker";
+import { SafeAreaView } from "react-native-safe-area-context";
+import FullScreenImageCarousel from "../components/FullScreenImageCarousel";
 const { width, height } = Dimensions.get("window");
 
 const NoticiasScreen = ({ navigation }: any) => {
@@ -37,7 +43,40 @@ const NoticiasScreen = ({ navigation }: any) => {
   const [modalIndex, setModalIndex] = useState<number>(0);
   const [cargando, setCargando] = useState(false);
 
+  const filterOpacity = useRef(new Animated.Value(1)).current; // Control de la opacidad
+  const lastScrollY = useRef(0);
+  const isFilterVisible = useRef(true);
+  const [showFloatingFilter, setShowFloatingFilter] = useState(false);
+  const fixedFilterOpacity = useRef(new Animated.Value(1)).current;
+  const floatingFilterOpacity = useRef(new Animated.Value(0)).current;
+  // import { Modal, View, FlatList, Image, TouchableWithoutFeedback, Dimensions, StyleSheet } from 'react-native';
+
+  // const { width, height } = Dimensions.get('window');
   const limit = 10; // Puedes ajustar el número de noticias por página
+
+  const filterHeight = 80;
+  const filtros = [
+    { label: "Accidente", value: "accidente", icon: "🚑" },
+    { label: "Todos", value: "todos", icon: "📰" },
+    { label: "Bloqueo", value: "bloqueo", icon: "🚧" },
+    { label: "Clima", value: "clima", icon: "🌤️" },
+    { label: "Obras", value: "obras", icon: "🏗️" },
+    { label: "Otro", value: "otro", icon: "❓" },
+  ];
+  const filterContainerStyles = {
+    height: filterHeight,
+    backgroundColor: "#fff",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  };
 
   const fetchNoticias = async (pageToLoad = 1, isRefreshing = false) => {
     try {
@@ -83,6 +122,8 @@ const NoticiasScreen = ({ navigation }: any) => {
     fetchNoticias(page);
   }, [page, tipoFiltro]);
 
+ 
+  
   // Filtrar noticias por tipo
   const filteredNoticias = noticias.filter((noticia) => {
     if (tipoFiltro === "todos") return true;
@@ -114,9 +155,39 @@ const NoticiasScreen = ({ navigation }: any) => {
     setModalIndex(allImages.indexOf(imageUrl));
     setModalVisible(true);
   };
-
   const closeModal = () => {
     setModalVisible(false);
+  };
+  // const filterOpacity = useRef(new Animated.Value(1)).current;
+  const [showFilter, setShowFilter] = useState(true);
+
+  const toggleFilterVisibility = (show: boolean) => {
+    if (show === showFilter) return;
+    setShowFilter(show);
+    Animated.timing(filterOpacity, {
+      toValue: show ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+
+    if (Math.abs(currentY - lastScrollY.current) < 5) return;
+
+    const scrollingUp = currentY < lastScrollY.current;
+
+    // Mostrar u ocultar filtro flotante según el scroll
+    if (scrollingUp && currentY > 300) {
+      setShowFloatingFilter(true);
+    } else {
+      setShowFloatingFilter(false);
+    }
+
+    toggleFilterVisibility(currentY <= 5); // filtro superior solo cuando estás al inicio
+
+    lastScrollY.current = currentY;
   };
 
   if (loading && noticias.length === 0) {
@@ -127,9 +198,46 @@ const NoticiasScreen = ({ navigation }: any) => {
     );
   }
 
+  // console.log(noticias)
   return (
     <View style={{ flex: 1 }}>
-      <View style={styles.filterChipsContainer}>
+      {showFloatingFilter && (
+        <View style={[styles.floatingFilter, filterContainerStyles]}>
+          {[...filtros].map((filtro) => (
+            <TouchableOpacity
+              key={filtro.value}
+              style={[
+                styles.chip,
+                tipoFiltro === filtro.value && styles.chipSelected,
+              ]}
+              onPress={() => setTipoFiltro(filtro.value)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  tipoFiltro === filtro.value && styles.chipTextSelected,
+                ]}
+              >
+                {filtro.icon} {filtro.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      <Animated.View
+        style={[
+          filterContainerStyles,
+          {
+            opacity: filterOpacity,
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+          },
+        ]}
+      >
         {[
           { label: "Accidente", value: "accidente", icon: "🚑" },
           { label: "Todos", value: "todos", icon: "📰" },
@@ -156,16 +264,25 @@ const NoticiasScreen = ({ navigation }: any) => {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </Animated.View>
 
       <FlatList
         data={filteredNoticias}
         keyExtractor={(item, index) => `${item.id}-${index}`}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingTop: 90 }]}
         onRefresh={onRefresh}
         refreshing={refreshing}
         onEndReached={loadMoreNoticias}
         onEndReachedThreshold={0.5}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        ListFooterComponent={
+          loading && noticias.length > 0 ? (
+            <View style={{ paddingVertical: 20 }}>
+              <ActivityIndicator size="small" color="#007bff" />
+            </View>
+          ) : null
+        }
         renderItem={({ item }) => {
           const isTextExpanded = expandedPostId === item._id;
 
@@ -194,6 +311,7 @@ const NoticiasScreen = ({ navigation }: any) => {
                 noticiaId={item._id}
                 confirmadoPorUsuario={item.confirmadoPorUsuario}
                 totalConfirmaciones={item.confirmaciones.length}
+                totalComentarios={item.totalComentarios}
                 onCommentsPress={() => handleCommentsNavigation(item._id)}
               />
             </View>
@@ -211,13 +329,13 @@ const NoticiasScreen = ({ navigation }: any) => {
       />
 
       {/* Modal para mostrar la imagen */}
-      <Modal
+      {/* <Modal
         visible={modalVisible}
-        transparent={true}
+        transparent={false}
         animationType="fade"
         onRequestClose={closeModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "black" }}>
           <FlatList
             horizontal
             pagingEnabled
@@ -226,7 +344,11 @@ const NoticiasScreen = ({ navigation }: any) => {
             keyExtractor={(item, index) => index.toString()}
             renderItem={({ item }) => (
               <TouchableWithoutFeedback onPress={closeModal}>
-                <Image source={{ uri: item }} style={styles.fullScreenImage} />
+                <Image
+                  source={{ uri: item }}
+                  style={styles.fullScreenImage}
+                  resizeMode="contain"
+                />
               </TouchableWithoutFeedback>
             )}
             getItemLayout={(data, index) => ({
@@ -234,14 +356,25 @@ const NoticiasScreen = ({ navigation }: any) => {
               offset: width * index,
               index,
             })}
+            showsHorizontalScrollIndicator={false}
           />
-        </View>
-      </Modal>
+        </SafeAreaView>
+      </Modal> */}
+      <FullScreenImageCarousel
+        visible={modalVisible}
+        images={modalImages}
+        initialIndex={modalIndex}
+        onClose={closeModal}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  fullScreenImage: {
+    width: Dimensions.get("screen").width,
+    height: Dimensions.get("screen").height, // usamos 'screen' no 'window'
+  },
   center: {
     flex: 1,
     justifyContent: "center",
@@ -265,7 +398,7 @@ const styles = StyleSheet.create({
   },
   list: {
     padding: 12,
-    backgroundColor: "#f0f2f5",
+    backgroundColor: "#fff",
   },
   card: {
     backgroundColor: "#fff",
@@ -284,22 +417,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.8)",
   },
-  fullScreenImage: {
-    width: width,
-    height: height,
-    resizeMode: "contain",
-  },
+ 
   filterChipsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
+    alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 10,
     backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
   },
+
   chip: {
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -317,7 +446,24 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
-  
+  floatingFilter: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    zIndex: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
 });
 
 export default NoticiasScreen;

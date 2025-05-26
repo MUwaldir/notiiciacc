@@ -77,10 +77,14 @@ const LoginScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require("../../assets/logo_app_central.png")}
-        style={styles.logo}
-      />
+      <View style={styles.logoContainer}>
+        <Image
+          source={require("../../assets/logo_app_central.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
+
       <Text style={styles.title}>Bienvenido a Noticias</Text>
       <TextInput
         style={styles.input}
@@ -126,11 +130,17 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: "#fff",
   },
-  logo: {
-    width: 400,
-    height: 200,
-    marginBottom: 40,
+  logoContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 30,
   },
+  
+  logo: {
+    width: "80%",
+    height: 120,
+  },
+  
   title: {
     fontSize: 26,
     color: "#8B0000",

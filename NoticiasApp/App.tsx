@@ -11,9 +11,10 @@ import ComentariosScreen from "./src/screens/ComentariosScreen";
 import { RootStackParamList, RootTabParamList } from "./src/types/types";
 import CrearNoticia from "./src/screens/CrearNoticia";
 import { Image, Text, TouchableOpacity } from "react-native";
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon from "react-native-vector-icons/MaterialIcons";
 import { MisNoticiasScreen } from "./src/screens/MisNoticiasScreen";
 import { EditarNoticiaScreen } from "./src/screens/EditarNoticia";
+import FullScreenCarousel from "./src/components/FullScreenImageCarousel";
 // O también puedes usar otros como FontAwesome, Ionicons, etc.
 
 export const AuthContext = createContext<any>(null);
@@ -56,7 +57,11 @@ const MainApp = () => {
         ),
       })}
     >
-      <Tab.Screen name="Noticias" component={NoticiasScreen} />
+      <Tab.Screen
+        name="Noticias"
+        component={NoticiasScreen}
+        options={{ title: "Noticias Carretera Central" }}
+      />
       <Tab.Screen name="Perfil" component={PerfilScreen} />
       <Tab.Screen name="Crear Noticia" component={CrearNoticia} />
     </Tab.Navigator>
@@ -94,9 +99,11 @@ export default function App() {
               <Stack.Screen name="Comentarios" component={ComentariosScreen} />
               <Stack.Screen name="CrearNoticia" component={CrearNoticia} />
               <Stack.Screen name="MisNoticias" component={MisNoticiasScreen} />
-              <Stack.Screen name="EditarNoticia" component={EditarNoticiaScreen} />
-
-
+              <Stack.Screen
+                name="EditarNoticia"
+                component={EditarNoticiaScreen}
+              />
+            
             </>
           ) : (
             <>

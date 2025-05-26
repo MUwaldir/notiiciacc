@@ -10,6 +10,10 @@ import {
   SafeAreaView,
   StatusBar,
   Image,
+  Modal,
+  Platform,
+  KeyboardAvoidingView,
+  Pressable,
 } from "react-native";
 import api from "../api/axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -21,6 +25,10 @@ const ComentariosScreen = ({ route }: any) => {
   const [nuevoComentario, setNuevoComentario] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Estado para el modal de imagen
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedAvatarUri, setSelectedAvatarUri] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchComentarios = async () => {
@@ -40,7 +48,7 @@ const ComentariosScreen = ({ route }: any) => {
   }, [noticiaId]);
 
   const handleComentarioSubmit = async () => {
-    const userData = await AsyncStorage.getItem('user');
+    const userData = await AsyncStorage.getItem("user");
     const parsedUserData = userData ? JSON.parse(userData) : null;
 
     if (!nuevoComentario.trim()) return;
@@ -85,7 +93,6 @@ const ComentariosScreen = ({ route }: any) => {
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
 
-      // Formatear la fecha a 'Hoy', 'Ayer' o la fecha en formato 'dd MMM'
       let dateLabel = "";
       if (commentDate.toDateString() === today.toDateString()) {
         dateLabel = "Hoy";
@@ -110,15 +117,25 @@ const ComentariosScreen = ({ route }: any) => {
 
   const groupedComentarios = groupCommentsByDate(comentarios);
 
+  // Función para abrir el modal con el avatar seleccionado
+  const openAvatarModal = (uri: string | undefined) => {
+    if (uri) {
+      setSelectedAvatarUri(uri);
+      setModalVisible(true);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#8B0000" />
-      <View style={styles.header}>
-        <Text style={styles.title}>Comentarios</Text>
-      </View>
-
-      <View style={styles.container}>
-        {error && <Text style={styles.errorText}>{error}</Text>}
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : StatusBar.currentHeight}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Comentarios</Text>
+        </View>
 
         <FlatList
           data={Object.keys(groupedComentarios)}
@@ -129,23 +146,26 @@ const ComentariosScreen = ({ route }: any) => {
               {groupedComentarios[dateLabel].map((comment: any, index: number) => (
                 <View key={comment._id || index} style={styles.commentCard}>
                   <View style={styles.avatarRow}>
-                    <Image
-                      source={
-                        comment?.autor.imagen
-                          ? { uri: comment.autor.imagen }
-                          : require("../../assets/avatar-de-usuario.png")
-                      }
-                      style={styles.avatar}
-                    />
+                    <TouchableOpacity
+                      onPress={() => openAvatarModal(comment?.autor.imagen)}
+                      activeOpacity={0.7}
+                    >
+                      <Image
+                        source={
+                          comment?.autor.imagen
+                            ? { uri: comment.autor.imagen }
+                            : require("../../assets/avatar-de-usuario.png")
+                        }
+                        style={styles.avatar}
+                      />
+                    </TouchableOpacity>
                     <Text style={styles.commentUser}>
                       {comment.autor?.nombre || "Usuario"}
                     </Text>
                   </View>
                   <Text style={styles.commentContent}>{comment.contenido}</Text>
                   {comment.createdAt && (
-                    <Text style={styles.commentDate}>
-                      {formatDateTime(comment.createdAt)}
-                    </Text>
+                    <Text style={styles.commentDate}>{formatDateTime(comment.createdAt)}</Text>
                   )}
                 </View>
               ))}
@@ -156,6 +176,7 @@ const ComentariosScreen = ({ route }: any) => {
               Sé el primero en dejar tu opinión sobre esta noticia 🗣️
             </Text>
           }
+          contentContainerStyle={{ paddingBottom: 100 }}
         />
 
         <View style={styles.inputContainer}>
@@ -166,14 +187,31 @@ const ComentariosScreen = ({ route }: any) => {
             placeholder="Escribe un comentario..."
             placeholderTextColor="#999"
           />
-          <TouchableOpacity
-            onPress={handleComentarioSubmit}
-            style={styles.submitButton}
-          >
+          <TouchableOpacity onPress={handleComentarioSubmit} style={styles.submitButton}>
             <Text style={styles.submitText}>Enviar</Text>
           </TouchableOpacity>
         </View>
-      </View>
+
+        {/* Modal para mostrar avatar en pantalla completa */}
+        <Modal
+          visible={modalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <Pressable style={styles.modalBackground} onPress={() => setModalVisible(false)}>
+            <Image
+              source={
+                selectedAvatarUri
+                  ? { uri: selectedAvatarUri }
+                  : require("../../assets/avatar-de-usuario.png")
+              }
+              style={styles.fullscreenAvatar}
+              resizeMode="contain"
+            />
+          </Pressable>
+        </Modal>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -185,20 +223,24 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: "#8B0000",
-    paddingVertical: 16,
+    paddingVertical: 10,
     paddingHorizontal: 20,
+    
   },
   title: {
+    paddingTop:16,
     fontSize: 24,
     fontWeight: "bold",
     color: "#fff",
   },
   container: {
     flex: 1,
-    padding: 16,
+    paddingTop: 0,
+    paddingBottom: 16,
     backgroundColor: "#fff",
   },
   dateSection: {
+    padding: 8,
     marginBottom: 10,
   },
   dateLabel: {
@@ -255,6 +297,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
     paddingVertical: 8,
+    paddingBottom: Platform.OS === "android" ? 20 : 8,
     borderTopWidth: 1,
     borderColor: "#ddd",
     backgroundColor: "#fafafa",
@@ -285,6 +328,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 15,
     fontWeight: "500",
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullscreenAvatar: {
+    width: "90%",
+    height: "90%",
+    borderRadius: 15,
   },
 });
 
